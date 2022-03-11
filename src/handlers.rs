@@ -13,10 +13,15 @@ pub struct TargetHandler {}
 impl TargetHandler {
     pub fn handle(line: &str, stream: &mut Stream) -> Box<dyn ASTNode> {
         /* handle \w:*, and read in more lines to complete the target */
-        let target_name = String::new();
+        let target_name = line
+            .split_once(':')
+            .expect("TargetHandler: Expected ':' after target name")
+            .0
+            .trim_end(); // remove any leading space after target name
 
-        let target_ast = Target {
-            target_name,
+        let mut target_ast = Target {
+            target_name: target_name.to_string(),
+            deps: Vec::new(),
             steps: Vec::new(),
         };
 
@@ -25,9 +30,12 @@ impl TargetHandler {
             let line = stream.peek_next_line();
 
             if !line.starts_with('\t') {
-                
                 break;
             }
+
+            target_ast
+                .steps
+                .push(Box::new(TargetGenericStep::new(line.trim().to_string())));
 
             // todo!();
 
