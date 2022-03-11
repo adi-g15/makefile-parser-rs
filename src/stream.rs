@@ -95,6 +95,7 @@ impl Stream {
         /* Cannot move out of mutable borrowed values... ie. cannot move self.next_line, while self is a reference (mutable or immutable) */
         let old_line = self.next_line.clone();
 
+        println!("{}", old_line);
         /*
          * @note: In case current statement is a include, don't read in next line from current file... the next line should be of the included file... so self.read_in_next_line() must be called inside Stream::include_file
          * */

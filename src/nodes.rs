@@ -113,6 +113,54 @@ impl UnExportASTNode {
 
 impl ASTNode for UnExportASTNode {}
 
+pub struct IfASTNode {
+    pub condition: String,
+    pub steps: Vec<Box<dyn ASTNode>>,
+    pub elseif_: Option<Box<IfASTNode>>,
+    pub else_: Option<Box<ElseASTNode>>,
+}
+
+pub struct ElseASTNode {
+    pub steps: Vec<Box<dyn ASTNode>>,
+}
+
+impl ASTNode for IfASTNode {}
+impl ASTNode for ElseASTNode {}
+
+impl Debug for IfASTNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(&format!("If: {}\n", self.condition))?;
+        f.write_str(&format!("\t\t\tSteps:\n"))?;
+
+        for (i, step) in self.steps.iter().enumerate() {
+            f.write_str(&format!("\t\t\t\t{}: {:?}\n", i, step))?;
+        }
+
+        if let Some(elseif_) = &self.elseif_ {
+            f.write_str(&format!("\t\tElse {:?}", elseif_))?;
+        }
+
+        if let Some(else_) = &self.else_ {
+            f.write_str(&format!("\t\t{:?}", else_))?;
+        }
+
+        Ok(())
+    }
+}
+
+impl Debug for ElseASTNode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(&format!("Else:\n"))?;
+        f.write_str(&format!("\t\t\tSteps:\n"))?;
+
+        for (i, step) in self.steps.iter().enumerate() {
+            f.write_str(&format!("\t\t\t\t{}: {:?}\n", i, step))?;
+        }
+
+        Ok(())
+    }
+}
+
 pub struct TargetGenericStep {
     line: String,
 }

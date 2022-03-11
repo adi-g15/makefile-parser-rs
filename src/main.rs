@@ -104,6 +104,10 @@ fn main() {
             let t = TargetHandler::handle(line, &mut stream, &mut ast.context);
 
             ast.push(t);
+        } else if line.starts_with("ifeq") {
+            let ifnode = IfHandler::handle(line, &mut stream, &mut ast.context);
+
+            ast.push(ifnode);
         } else {
             println!("❗ Unhandled: {}", line);
         }
