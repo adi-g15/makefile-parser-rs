@@ -30,6 +30,10 @@ impl Stream {
         stream
     }
 
+    pub fn get_current_file(&self) -> Option<PathBuf> {
+        self.lineiterators_stack.last().map(|pair| pair.1.clone())
+    }
+
     /**
      * @brief Sets self.next_line to the next line
      * Or set EOF if no more lines can be read
@@ -123,7 +127,7 @@ impl Stream {
 
 impl Stream {
     pub fn handle(&mut self, line: &str, _c: Option<&mut Context>) -> Box<dyn ASTNode> {
-        let tokens: Vec<&str> = line.split(' ').collect();
+        let tokens: Vec<&str> = line.split_whitespace().collect();
 
         if tokens.len() < 2 || !tokens[0].contains(&"include") {
             panic!("Stream handler handles input strings of form \"include \"filename\"\"");

@@ -108,7 +108,9 @@ fn main() {
             ast.push(stream.handle(line, None));
         } else if regex_target.is_match(line) {
             debug!("Target");
-            ast.push(TargetHandler::handle(line, &mut stream));
+            let t = TargetHandler::handle(line, &mut stream, &mut ast.context);
+
+            ast.push(t);
         } else {
             println!("❗ Unhandled: {}", line);
         }

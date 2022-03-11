@@ -1,4 +1,7 @@
-use std::fmt::{Debug, Formatter};
+use std::{
+    fmt::{Debug, Formatter, Write},
+    path::PathBuf,
+};
 
 /**
  * Ignore comments for now
@@ -28,6 +31,7 @@ impl ASTNode for Comment {}
 pub struct Target {
     pub target_name: String,
     pub deps: Vec<String>,
+    pub defined_in: PathBuf,
     pub steps: Vec<Box<dyn ASTNode>>,
 }
 
@@ -37,6 +41,7 @@ impl Debug for Target {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.write_str(&format!("Target: {}\n", self.target_name))?;
         f.write_str(&format!("\t\t\tDeps: {:?}\n", self.deps))?;
+        f.write_str(&format!("\t\t\tDefined in: {:?}\n", self.defined_in))?;
         f.write_str(&format!("\t\t\tSteps:\n"))?;
 
         for (i, step) in self.steps.iter().enumerate() {
@@ -89,7 +94,29 @@ impl ASTNode for TargetGenericStep {}
 
 impl Debug for TargetGenericStep {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(&format!("{}", self.line))
+        let mut it = self.line.split("&&");
+
+        /* SAFETY: First .split().next() must always succeed, given a non-empty string */
+        let command1 = it.next().unwrap();
+        let command2 = it.next();
+
+        match command2 {
+            None => {
+                /* Single command */
+                f.write_str(&format!("{}", command1))
+            }
+            Some(command2) => {
+                /* Multiple commands separated with '&&' */
+                f.write_str(&format!("{} && \\", command1))?;
+                f.write_str(&format!("\n\t\t\t\t{}", command2))?;
+
+                while let Some(command) = it.next() {
+                    f.write_str(&format!("&& \\\n\t\t\t\t{}", command))?;
+                }
+
+                f.write_char('\n')
+            }
+        }
     }
 }
 

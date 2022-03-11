@@ -11,21 +11,30 @@ pub trait Handler {
 pub struct TargetHandler {}
 
 impl TargetHandler {
-    pub fn handle(line: &str, stream: &mut Stream) -> Box<dyn ASTNode> {
+    pub fn handle(line: &str, stream: &mut Stream, context: &mut Context) -> Box<dyn ASTNode> {
         /* handle \w:*, and read in more lines to complete the target */
-        let target_name = line
+        let (target_name, dependencies) = line
             .split_once(':')
-            .expect("TargetHandler: Expected ':' after target name")
-            .0
-            .trim_end(); // remove any leading space after target name
+            .expect("TargetHandler: Expected ':' after target name");
+
+        let target_name = target_name.trim_end(); // remove any leading space after target name
+
+        let mut deps = Vec::new();
+        let dependencies = dependencies.trim();
+
+        for dependency in dependencies.split_whitespace() {
+            deps.push(dependency.to_string());
+        }
 
         let mut target_ast = Target {
             target_name: target_name.to_string(),
-            deps: Vec::new(),
+            defined_in: stream.get_current_file().expect(
+                "TargetHandler: If a target was read, then there must be a file from it was read",
+            ),
+            deps,
             steps: Vec::new(),
         };
 
-        /* TODO: line is not at indent of 4, then done */
         loop {
             let line = stream.peek_next_line();
 
@@ -33,17 +42,41 @@ impl TargetHandler {
                 break;
             }
 
-            target_ast
-                .steps
-                .push(Box::new(TargetGenericStep::new(line.trim().to_string())));
-
-            // todo!();
+            if !line.trim().is_empty() {
+                target_ast
+                    .steps
+                    .push(TargetStepHandler::handle(line, Some(context)));
+            }
 
             /* read in next line */
             stream.read_line();
         }
 
         Box::new(target_ast)
+    }
+}
+
+/* Handles steps and categorizing them into different types */
+struct TargetStepHandler {}
+
+impl Handler for TargetStepHandler {
+    fn handle(line: &str, _c: Option<&mut Context>) -> Box<dyn ASTNode> {
+        let line = line.trim();
+
+        if line.starts_with('#') {
+            CommentHandler::handle(line, None)
+        } else {
+            Box::new(TargetGenericStep::new(line.to_string()))
+        }
+
+        /*
+
+        BUG: Makefile Line 90 is problematic for this... ie. export PATH=... && command, then it sets value of PATH as "\"value\" && command", and I cannot think of a better way to handle '&&'
+
+        else if line.starts_with("export") || line.starts_with("unexport") {
+            /* NOTE: export statements must be handled before regex_variable, as it will regex_variable will also match 'export ...=...' */
+            ExportHandler::handle(line, Some(_c.expect("TargetStepHandler: export/unexport: Handling these requires access to the context, pass Some(context) instead of None")))
+        }*/
     }
 }
 
