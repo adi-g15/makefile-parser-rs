@@ -53,8 +53,20 @@ impl Stream {
             /* loop until either we find a non-empty line, OR EOF is encountered */
             match line_iter.next() {
                 Some(res) => {
-                    let s = res.expect("Failed to read file");
+                    let mut s = res.expect("Failed to read file");
                     if !s.trim().is_empty() {
+                        /* If this line ends with a '\', read in the next line and join it, this may recurse deep depending on how many consecutive lines end with a '\' */
+                        if s.ends_with('\\') {
+                            s.pop(); // remove the '\' character
+                            self.read_in_next_line();
+
+                            /* If the next line that was read is empty... that means end this recursion, next line was empty.
+                             * This check is needed, because self.read_in_next_line by default, ignores empty lines, so an '\' followed by an empty line will be skipped and read in some other next lines, while actually this line should logically end with the empty line also */
+                            if self.peek_next_line().trim().is_empty() {
+                                break s;
+                            }
+                            s += self.peek_next_line().trim();
+                        }
                         break s;
                     }
                 }
