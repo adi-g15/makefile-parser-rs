@@ -1,13 +1,12 @@
 use crate::nodes::ASTNode;
 use std::collections::BTreeMap;
-use std::fmt::{Formatter, Write};
-use std::{collections::HashMap, fmt::Debug};
+use std::fmt::{Debug, Formatter, Write};
+use std::path::{Path, PathBuf};
 
 pub struct AST {
-    /* @adig - Don't include include statements in this */
-    pub nodes: Vec<Box<dyn ASTNode>>,
     /* Holds a global context... variables defined till now */
     pub context: Context,
+    pub nodes: Vec<Box<dyn ASTNode>>,
 }
 
 impl Debug for AST {
@@ -25,10 +24,10 @@ impl Debug for AST {
 }
 
 impl AST {
-    pub fn new() -> Self {
+    pub fn new(root_makefile_parent_dir: &Path) -> Self {
         AST {
+            context: Context::new(root_makefile_parent_dir.to_path_buf()),
             nodes: Vec::new(),
-            context: Context::new(),
         }
     }
 
@@ -41,6 +40,7 @@ pub struct Context {
     modifiables: Vec<String>,
     simple_expanded: Vec<String>,
     mapping: BTreeMap<String, String>,
+    pub root_makefile_dir: PathBuf,
 }
 
 impl Debug for Context {
@@ -66,8 +66,9 @@ impl Debug for Context {
 }
 
 impl Context {
-    pub fn new() -> Self {
+    pub fn new(root_makefile_dir: PathBuf) -> Self {
         Context {
+            root_makefile_dir,
             modifiables: Vec::new(),
             simple_expanded: Vec::new(),
             mapping: BTreeMap::new(),
@@ -82,7 +83,7 @@ impl Context {
      * @note If the key was already present, then this call will 'update' the
      * value, previous value is lost
      */
-    pub fn set(&mut self, mut var_name: String, new_value: String) {
+    pub fn set(&mut self, mut var_name: String, mut new_value: String) {
         if var_name.ends_with('?') {
             /* remove '?' from name */
             var_name.pop();
@@ -96,6 +97,16 @@ impl Context {
             var_name = var_name.trim_end_matches(':').to_string();
 
             self.simple_expanded.push(var_name.clone());
+        }
+
+        if var_name.ends_with('+') {
+            /* remove '+' from name */
+            var_name.pop();
+
+            /* modify new_value by adding it to previous value if any exists */
+            if let Some(old_value) = self.get(&var_name) {
+                new_value = old_value.clone() + " " + &new_value;
+            }
         }
 
         self.mapping.insert(var_name, new_value);

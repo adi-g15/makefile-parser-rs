@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::ast::Context;
 use crate::nodes::*;
 use crate::stream::Stream;
@@ -35,6 +37,9 @@ impl TargetHandler {
             steps: Vec::new(),
         };
 
+        /* To keep track of `cd` statements, will be helpful to get relative locations later in cargo subcommands */
+        let mut current_dir = context.root_makefile_dir.clone();
+
         loop {
             let line = stream.peek_next_line();
 
@@ -43,9 +48,11 @@ impl TargetHandler {
             }
 
             if !line.trim().is_empty() {
-                target_ast
-                    .steps
-                    .push(TargetStepHandler::handle(line, Some(context)));
+                target_ast.steps.push(TargetStepHandler::handle(
+                    line,
+                    Some(context),
+                    &mut current_dir,
+                ));
             }
 
             /* read in next line */
@@ -59,13 +66,116 @@ impl TargetHandler {
 /* Handles steps and categorizing them into different types */
 struct TargetStepHandler {}
 
-impl Handler for TargetStepHandler {
-    fn handle(line: &str, _c: Option<&mut Context>) -> Box<dyn ASTNode> {
+impl TargetStepHandler {
+    fn handle(
+        line: &str,
+        context: Option<&mut Context>,
+        current_dir: &mut PathBuf,
+    ) -> Box<dyn ASTNode> {
         let line = line.trim();
 
         if line.starts_with('#') {
             CommentHandler::handle(line, None)
+        } else if line.starts_with("cargo") {
+            let mut it = line.split_whitespace().skip(1);
+
+            let subcommand = it
+                .next()
+                .expect("TargetStepHandler: cargo: Expected a cargo subcommand");
+
+            let manifest_path = line
+                .split_once("--manifest-path")
+                .map(|(_, second_part)|
+                    /* `second_part` contains the manifest path, just after --manifest-path, ie. first word in `second_part` */
+                    second_part
+                        .trim_start()
+                        .split_whitespace()
+                        .next()
+                        .expect("Expected a manifest path (Cargo.toml filepath), after --manifest-path")
+                );
+
+            let root_makefile_dir = context
+                .as_ref()
+                .expect("Expected reference to Context to get root makefile directory")
+                .root_makefile_dir
+                .clone();
+
+            let directory = match manifest_path {
+                Some(p) => current_dir
+                    .join(p)
+                    .strip_prefix(root_makefile_dir)
+                    .ok()
+                    .map(|p| {
+                        p.parent()
+                            .expect(&format!(
+                                "ERROR: Manifest path doesn't have a parent: {:?}",
+                                &p
+                            ))
+                            .to_str()
+                            .expect("Expected UTF-8 encoded filenames")
+                            .to_string()
+                    }),
+                None => None,
+            };
+
+            // #[cfg(debug_assertions)]
+            // {
+            // println!("Directory: {:?}", directory);
+            // println!("CurrentPath: {:?}", current_dir);
+            // println!("Manifest: {:?}", manifest_path);
+            // println!("Root: {:?}", context.unwrap().root_makefile_dir);
+            // }
+
+            match subcommand {
+                "build" => Box::new(Cargo {
+                    subcommand: CargoSubCommand::BUILD,
+                    directory,
+                    complete_cmd: line.to_string(),
+                }),
+                "clean" => Box::new(Cargo {
+                    subcommand: CargoSubCommand::CLEAN,
+                    directory,
+                    complete_cmd: line.to_string(),
+                }),
+                "run" => Box::new(Cargo {
+                    subcommand: CargoSubCommand::RUN,
+                    directory,
+                    complete_cmd: line.to_string(),
+                }),
+                "update" => Box::new(Cargo {
+                    subcommand: CargoSubCommand::UPDATE_DEPS,
+                    directory,
+                    complete_cmd: line.to_string(),
+                }),
+                _ => {
+                    println!(
+                        "⚠ Unknown cargo subcommand: {}... treating as simple string",
+                        subcommand
+                    );
+
+                    Box::new(TargetGenericStep::new(line.to_string()))
+                }
+            }
         } else {
+            /* Handle case of `cd` specially */
+            if line.starts_with("cd") {
+                let new_path = current_dir.join(
+                    line.split_whitespace()
+                        .skip(1)
+                        .next() /* first word after cd statement */
+                        .expect("Expected path after `cd` statement"),
+                );
+
+                if new_path.is_dir() {
+                    /* replace current_dir's value with new_path, if it is valid, else ignore */
+                    println!("Changed to {}", new_path.display());
+                    current_dir.push(new_path);
+                } else {
+                    println!("Failed to cd into {}", new_path.display());
+                    /* Ignoring a 'cd' */
+                }
+            }
+
             Box::new(TargetGenericStep::new(line.to_string()))
         }
 
@@ -80,7 +190,7 @@ impl Handler for TargetStepHandler {
     }
 }
 
-/* handle where ./... some executable started */
+/* @Dropped May resume in future though, handle where ./... some executable started */
 pub struct ExecutableHandler {}
 
 pub struct CommentHandler {}
@@ -95,9 +205,6 @@ impl Handler for CommentHandler {
         }
     }
 }
-
-/* handle 'cargo build', add as 'build dep' */
-pub struct CargoCommandsHandler {}
 
 pub struct ExportHandler {}
 

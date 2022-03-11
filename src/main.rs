@@ -58,12 +58,11 @@ fn main() {
     #[cfg(debug_assertions)]
     println!("Changing directory to: {:?}", Path::new(&makefile).parent());
 
-    std::env::set_current_dir(
-        Path::new(&makefile)
-            .parent()
-            .expect("Failed to get parent directory of given Makefile path"),
-    )
-    .expect("Failed to change directory");
+    let root_dir = Path::new(&makefile)
+        .parent()
+        .expect("Failed to get parent directory of given Makefile path");
+
+    std::env::set_current_dir(root_dir).expect("Failed to change directory");
 
     // starting with Makefile in $(cwd)
     let makefile = Path::new(&makefile)
@@ -73,28 +72,24 @@ fn main() {
         .expect("Path must be UTF-8 encoded characters only");
 
     let mut stream = Stream::new(makefile);
-    let mut ast = AST::new();
+    let mut ast = AST::new(root_dir);
 
     let regex_target = Regex::new(r"\w:.*$").unwrap();
-    let regex_variable = Regex::new(r"\w+ *[\?:]?=").unwrap();
+    let regex_variable = Regex::new(r"\w+ *[\?:\+]?=").unwrap();
 
     while stream.eof == false {
         let l = stream.read_line();
         let line = l.trim();
 
-        debug!(line);
+        // debug!(line);
 
         if line.starts_with('#') {
-            debug!("Comment");
             ast.push(CommentHandler::handle(line, None));
         } else if line.starts_with("export") || line.starts_with("unexport") {
             /* NOTE: export statements must be handled before regex_variable, as it will regex_variable will also match 'export ...=...' */
-            debug!("export/unexport");
-
             ast.nodes
                 .push(ExportHandler::handle(line, Some(&mut ast.context)));
         } else if regex_variable.is_match(line) {
-            debug!("Var");
             // Modify context
             /* SAFETY: Regex matched so, it is of the form ARCH?=x86... so split at '=' must return Some() */
             let (var_name, var_value) = line.split_once('=').unwrap();
@@ -104,10 +99,8 @@ fn main() {
 
             ast.context.set(var_name, var_value);
         } else if line.starts_with("include") {
-            debug!("Include");
             ast.push(stream.handle(line, None));
         } else if regex_target.is_match(line) {
-            debug!("Target");
             let t = TargetHandler::handle(line, &mut stream, &mut ast.context);
 
             ast.push(t);

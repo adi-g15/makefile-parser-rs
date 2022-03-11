@@ -28,6 +28,33 @@ impl Comment {
 
 impl ASTNode for Comment {}
 
+#[derive(Debug)]
+pub enum CargoSubCommand {
+    BUILD,
+    CLEAN,
+    RUN,
+    UPDATE_DEPS,
+}
+
+pub struct Cargo {
+    pub subcommand: CargoSubCommand,
+    pub complete_cmd: String,
+    pub directory: Option<String>, // `None` signifies Self, building/cleaning the current directory
+}
+
+impl Debug for Cargo {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str(&format!(
+            "Cargo: {:?} {}\n",
+            self.subcommand,
+            self.directory.as_ref().unwrap_or(&"".to_string())
+        ))?;
+        f.write_str(&format!("\t\t\t\tOriginal: {:?}\n", self.complete_cmd))
+    }
+}
+
+impl ASTNode for Cargo {}
+
 pub struct Target {
     pub target_name: String,
     pub deps: Vec<String>,

@@ -66,7 +66,7 @@ impl Stream {
 
                             if self.peek_next_line().trim().starts_with('#') {
                                 #[cfg(debug_assertions)]
-                                println!("⚠ Wierd syntax: Ignoring a comment line, since previous line ends at '\'. Line: {}", self.peek_next_line());
+                                println!("⚠ Wierd syntax: Ignoring a comment line, since previous line ends at '\\'. Line: {}", self.peek_next_line());
 
                                 /* re-read next line, skipping the current one */
                                 self.read_in_next_line();
