@@ -1,4 +1,3 @@
-#![feature(option_result_contains)]
 use std::{env, path::Path, process::exit};
 
 use regex::Regex;
