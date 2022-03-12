@@ -1,15 +1,7 @@
+use regex::Regex;
 use std::path::PathBuf;
 
-use crate::ast::Context;
-use crate::nodes::*;
-use crate::stream::Stream;
-
-use regex::Regex;
-
-pub trait Handler {
-    /** When a handler doesn't need the context, pass None... else it is read-write */
-    fn handle(line: &str, context: Option<&mut Context>) -> Box<dyn ASTNode>;
-}
+use crate::handlers::*;
 
 /* handle \w:*, and read in more lines to complete the target */
 pub struct TargetHandler {}
@@ -66,10 +58,10 @@ impl TargetHandler {
 }
 
 /* Handles steps and categorizing them into different types */
-struct GenericStepHandler {}
+pub struct GenericStepHandler {}
 
 impl GenericStepHandler {
-    fn handle(line: &str, stream: &mut Stream, context: &mut Context) -> Box<dyn ASTNode> {
+    pub fn handle(line: &str, stream: &mut Stream, context: &mut Context) -> Box<dyn ASTNode> {
         let line = line.trim();
 
         let regex_target = Regex::new(r"\w:.*$").unwrap();
@@ -101,6 +93,9 @@ impl TargetStepHandler {
 
         if line.starts_with('#') {
             CommentHandler::handle(line, None)
+        } else if line.starts_with("export") || line.starts_with("unexport") {
+            /* NOTE: export statements must be handled before regex_variable, as it will regex_variable will also match 'export ...=...' */
+            ExportHandler::handle(line, context)
         } else if line.starts_with("cargo") {
             let mut it = line.split_whitespace().skip(1);
 
@@ -212,140 +207,5 @@ impl TargetStepHandler {
             /* NOTE: export statements must be handled before regex_variable, as it will regex_variable will also match 'export ...=...' */
             ExportHandler::handle(line, Some(_c.expect("TargetStepHandler: export/unexport: Handling these requires access to the context, pass Some(context) instead of None")))
         }*/
-    }
-}
-
-/* @Dropped May resume in future though, handle where ./... some executable started */
-pub struct ExecutableHandler {}
-
-pub struct CommentHandler {}
-
-impl Handler for CommentHandler {
-    fn handle(line: &str, _c: Option<&mut Context>) -> Box<dyn ASTNode> {
-        let trimmed = line.trim();
-        if trimmed.starts_with('#') {
-            Box::new(Comment::new(trimmed))
-        } else {
-            panic!("CommentHandler: Can only handle lines starting with '#'");
-        }
-    }
-}
-
-pub struct ExportHandler {}
-
-impl Handler for ExportHandler {
-    fn handle(line: &str, context: Option<&mut Context>) -> Box<dyn ASTNode> {
-        let context = context.expect(
-            "ExportHandler requires the context to set or unset exported or unexported variables",
-        );
-
-        let (token, var_expr) = line
-            .split_once(' ')
-            .expect("Expected a name after 'export/unexport '");
-
-        let var_expr = var_expr.trim();
-
-        if token == "export" {
-            // BUG: Makefile Line 90 && will get ignored
-            let (var_name, var_value) = var_expr
-                .split_once('=')
-                .expect("Expected var=value expression after \"export\" token");
-
-            context.set(var_name.to_string(), var_value.to_string());
-
-            Box::new(ExportASTNode::new(
-                var_name.to_string(),
-                var_value.to_string(),
-            ))
-        } else if token == "unexport" {
-            let var_name = var_expr;
-
-            context.unset(var_name);
-            Box::new(UnExportASTNode::new(var_name.to_string()))
-        } else {
-            panic!(
-                "ExportHandler:\n\tUnknown token: {}\n\tLine: {}",
-                token, line
-            );
-        }
-    }
-}
-
-/* handle if else conditions */
-pub struct IfHandler {}
-
-impl IfHandler {
-    pub fn handle(line: &str, stream: &mut Stream, context: &mut Context) -> Box<IfASTNode> {
-        let line = line.trim();
-
-        let condition = line
-            .split_once(' ')
-            .expect("Expected space between \"ifeq\" and a condition")
-            .1
-            .to_string();
-
-        let mut if_node = IfASTNode {
-            condition,
-            elseif_: None,
-            else_: None,
-            steps: Vec::new(),
-        };
-
-        /* DON'T use stream.peek_next_line here, since for else ifeq we call this with custom `line` string, and it would go into inifinite loop */
-        let mut next_line = line.trim_start().to_string();
-
-        // For some reason... this will go into infinite loop, it's too late at night kal dekh lena be, ya to chhod rehne de aise hi
-        // stream.read_line(); // 'eat' current line with the if condition, read in next line
-
-        loop {
-            if next_line.starts_with("endif") {
-                /* endif encountered, current line is `endif`, so read in next line (ie. our work done) and exit */
-                stream.read_line();
-                break;
-            }
-
-            if next_line.starts_with("else") {
-                let mut line = String::new();
-
-                /* loop to join all but first word/token in `next_line` */
-                for token in next_line.split_whitespace().skip(1) {
-                    line += token;
-                    line += " ";
-                }
-
-                if line.starts_with("ifeq") {
-                    /* else-ifeq block (with 'else' token removed)*/
-                    if_node.elseif_ = Some(IfHandler::handle(&line, stream, context));
-                } else {
-                    /* Simple else block - Just read in the lines in else blocks */
-
-                    let mut else_ = ElseASTNode { steps: Vec::new() };
-                    loop {
-                        let next_line = stream.peek_next_line().trim_start().to_string();
-
-                        if next_line.starts_with("endif") {
-                            /* endif encountered, if condition ends */
-                            break;
-                        }
-
-                        else_
-                            .steps
-                            .push(GenericStepHandler::handle(&next_line, stream, context));
-                        stream.read_line();
-                    }
-                    if_node.else_ = Some(Box::new(else_));
-                }
-                break; // leave the outer loop too, since else block is handled, and else ifeq will recursively reach else too
-            }
-
-            if_node
-                .steps
-                .push(GenericStepHandler::handle(&next_line, stream, context));
-
-            stream.read_line();
-            next_line = stream.peek_next_line().trim().to_string();
-        }
-
-        Box::new(if_node)
     }
 }

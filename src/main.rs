@@ -1,4 +1,5 @@
 use std::{env, path::Path, process::exit};
+use time::{Duration, Instant};
 
 use regex::Regex;
 
@@ -9,25 +10,9 @@ mod stream;
 
 use ast::AST;
 use handlers::*;
-use nodes::*;
 use stream::Stream;
 
 // https://users.rust-lang.org/t/show-value-only-in-debug-mode/43686/2
-macro_rules! debug {
-    ($($e:expr),+) => {
-        {
-            #[cfg(debug_assertions)]
-            {
-                dbg!($($e),+)
-            }
-            #[cfg(not(debug_assertions))]
-            {
-                ($($e),+)
-            }
-        }
-    };
-}
-
 macro_rules! debugln {
     ($($e:expr),+) => {
         {
@@ -44,6 +29,8 @@ macro_rules! debugln {
 }
 
 fn main() {
+    let start = Instant::now();
+    let mut duration_in_if = Duration::new(0, 0);
     let mut args = env::args().skip(1); // Skip first argument (which is executable path)
 
     let makefile = match args.next() {
@@ -54,8 +41,7 @@ fn main() {
         }
     };
 
-    #[cfg(debug_assertions)]
-    println!("Changing directory to: {:?}", Path::new(&makefile).parent());
+    debugln!("Changing directory to: {:?}", Path::new(&makefile).parent());
 
     let root_dir = Path::new(&makefile)
         .parent()
@@ -104,7 +90,14 @@ fn main() {
 
             ast.push(t);
         } else if line.starts_with("ifeq") {
+            #[cfg(debug_assertions)]
+            let start = Instant::now();
             let ifnode = IfHandler::handle(line, &mut stream, &mut ast.context);
+
+            #[cfg(debug_assertions)]
+            {
+                duration_in_if += Instant::now() - start;
+            }
 
             ast.push(ifnode);
         } else {
@@ -112,5 +105,11 @@ fn main() {
         }
     }
 
+    let debug_start = Instant::now();
     println!("{:?}", ast);
+    let end = Instant::now();
+
+    debugln!("Time taken to print debug      : {:?}", end - debug_start);
+    debugln!("Time taken to complete program : {:?}", end - start);
+    debugln!("Time taken in ifeq statements  : {:?}", duration_in_if);
 }
