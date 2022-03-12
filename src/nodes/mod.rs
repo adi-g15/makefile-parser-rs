@@ -115,6 +115,7 @@ impl ASTNode for UnExportASTNode {}
 
 pub struct IfASTNode {
     pub condition: String,
+    pub is_not_eq: bool, // is it 'ifneq' (true) or 'ifeq' (false)
     pub steps: Vec<Box<dyn ASTNode>>,
     pub elseif_: Option<Box<IfASTNode>>,
     pub else_: Option<Box<ElseASTNode>>,
@@ -129,7 +130,11 @@ impl ASTNode for ElseASTNode {}
 
 impl Debug for IfASTNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(&format!("If: {}\n", self.condition))?;
+        f.write_str(&format!(
+            "If{}: {}\n",
+            if self.is_not_eq { "NotEq" } else { "Eq" },
+            self.condition
+        ))?;
         f.write_str(&format!("\t\t\tSteps:\n"))?;
 
         for (i, step) in self.steps.iter().enumerate() {

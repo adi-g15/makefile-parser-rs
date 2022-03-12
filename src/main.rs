@@ -106,7 +106,7 @@ fn main() {
     }
 
     let debug_start = Instant::now();
-    println!("{:?}", ast);
+    // println!("{:?}", ast);
     let end = Instant::now();
 
     debugln!("Time taken to print debug      : {:?}", end - debug_start);

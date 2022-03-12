@@ -69,6 +69,8 @@ impl GenericStepHandler {
 
         if line.starts_with('#') {
             CommentHandler::handle(line, None)
+        } else if line.starts_with("ifeq") || line.starts_with("ifneq") {
+            IfHandler::handle(line, stream, context)
         } else if line.starts_with("export") || line.starts_with("unexport") {
             /* NOTE: export statements must be handled before regex_variable, as it will regex_variable will also match 'export ...=...' */
             ExportHandler::handle(line, Some(context))

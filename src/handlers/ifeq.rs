@@ -28,14 +28,16 @@ impl IfHandler {
     pub fn handle(line: &str, stream: &mut Stream, context: &mut Context) -> Box<IfASTNode> {
         let line = line.trim();
 
-        let condition = line
+        let (ifeq, condition) = line
             .split_once(' ')
-            .expect("Expected space between \"ifeq\" and a condition")
-            .1
-            .to_string();
+            .expect("Expected space between \"ifeq\" and a condition");
+
+        let is_not_eq = ifeq.trim() == "ifneq";
+        let condition = condition.to_string();
 
         let mut if_node = IfASTNode {
             condition,
+            is_not_eq,
             elseif_: None,
             else_: None,
             steps: Vec::new(),
@@ -49,8 +51,6 @@ impl IfHandler {
         loop {
             debugln!("Line: {}", &next_line);
             if next_line.starts_with("endif") {
-                /* endif encountered, current line is `endif`, so read in next line (ie. our work done) and exit */
-                stream.read_line();
                 break;
             }
 
@@ -75,6 +75,7 @@ impl IfHandler {
                     let mut else_ = ElseASTNode { steps: Vec::new() };
                     loop {
                         let next_line = stream.peek_next_line().trim_start().to_string();
+                        debugln!("Else Line: {}", &next_line);
 
                         if next_line.starts_with("endif") {
                             /* endif encountered, if condition ends */
@@ -88,7 +89,10 @@ impl IfHandler {
                         else_
                             .steps
                             .push(GenericStepHandler::handle(&next_line, stream, context));
-                        stream.read_line();
+
+                        debugln!("Else step: {:?}", else_.steps.last().unwrap());
+
+                            stream.read_line();
                     }
                     if_node.else_ = Some(Box::new(else_));
                 }
