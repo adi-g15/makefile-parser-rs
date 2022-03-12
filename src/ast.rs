@@ -1,6 +1,8 @@
 use crate::nodes::ASTNode;
 use std::collections::BTreeMap;
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter, Write as FmtWrite};
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub struct AST {
@@ -33,6 +35,46 @@ impl AST {
 
     pub fn push(&mut self, node: Box<dyn ASTNode>) {
         self.nodes.push(node);
+    }
+
+    pub fn render_dot_file(&self, filepath: &str) {
+        let mut file = File::options()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(filepath)
+            .expect("Failed to create file: \"makefile-graph.dot\"");
+
+        /* SAFETY: Fail hi kyu hoga : ) */
+        file.write_fmt(format_args!("digraph example1 {{\n"))
+            .unwrap();
+
+        for (i, (k, v)) in self.context.mapping.iter().enumerate() {
+            file.write_fmt(format_args!(
+                "\tC{}[label=\"{}\t{}: {}\"];\n",
+                i,
+                k,
+                if self.context.modifiables.contains(&v) {
+                    '?'
+                } else if self.context.simple_expanded.contains(&v) {
+                    ':'
+                } else {
+                    ' '
+                },
+                v.replace('\"', "\\\"")
+            ))
+            .unwrap();
+
+            file.write_fmt(format_args!("\tContext -> C{};\n", i))
+                .unwrap();
+        }
+
+        let mut curr_i: u64 = 0;
+        for node in self.nodes.iter() {
+            file.write(format_args!("{}\n", node.render_graphviz_node(&mut curr_i));
+        }
+
+        file.write_fmt(format_args!("\n}}")).unwrap();
     }
 }
 

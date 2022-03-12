@@ -1,4 +1,4 @@
-use std::{env, path::Path, process::exit};
+use std::{env, fs::File, path::Path, process::exit};
 use time::{Duration, Instant};
 
 use regex::Regex;
@@ -47,6 +47,7 @@ fn main() {
         .parent()
         .expect("Failed to get parent directory of given Makefile path");
 
+    let original_dir = std::env::current_dir().expect("Current Working Directory is invalid");
     std::env::set_current_dir(root_dir).expect("Failed to change directory");
 
     // starting with Makefile in $(cwd)
@@ -107,6 +108,13 @@ fn main() {
 
     let debug_start = Instant::now();
     println!("{:?}", ast);
+
+    ast.render_dot_file(
+        original_dir
+            .join("makefile-graph.dot")
+            .to_str()
+            .expect("Expected UTF-8 encoded filename"),
+    );
     let end = Instant::now();
 
     debugln!("Time taken to print debug      : {:?}", end - debug_start);

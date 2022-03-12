@@ -1,5 +1,5 @@
 use std::{
-    fmt::{Debug, Formatter, Write},
+    fmt::{self, Debug, Formatter, Write},
     path::PathBuf,
 };
 
@@ -11,6 +11,7 @@ pub trait ASTNode
 where
     Self: Debug,
 {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments;
 }
 
 #[derive(Debug)]
@@ -26,7 +27,16 @@ impl Comment {
     }
 }
 
-impl ASTNode for Comment {}
+impl ASTNode for Comment {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        let args = format_args!(
+            "N{} [label=\"{}\"]\n\tN{} [label=\"{}\"]\n\n", curr_i, "Comment", curr_i + 1, );
+
+        *curr_i += 2;
+
+        args
+    }
+}
 
 #[derive(Debug)]
 pub enum CargoSubCommand {
@@ -53,7 +63,11 @@ impl Debug for Cargo {
     }
 }
 
-impl ASTNode for Cargo {}
+impl ASTNode for Cargo {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 pub struct Target {
     pub target_name: String,
@@ -62,7 +76,11 @@ pub struct Target {
     pub steps: Vec<Box<dyn ASTNode>>,
 }
 
-impl ASTNode for Target {}
+impl ASTNode for Target {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 impl Debug for Target {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -84,7 +102,11 @@ pub struct IncludeASTNode {
     pub include_path: String,
 }
 
-impl ASTNode for IncludeASTNode {}
+impl ASTNode for IncludeASTNode {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 #[derive(Debug)]
 pub struct ExportASTNode {
@@ -98,7 +120,11 @@ impl ExportASTNode {
     }
 }
 
-impl ASTNode for ExportASTNode {}
+impl ASTNode for ExportASTNode {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 #[derive(Debug)]
 pub struct UnExportASTNode {
@@ -111,7 +137,11 @@ impl UnExportASTNode {
     }
 }
 
-impl ASTNode for UnExportASTNode {}
+impl ASTNode for UnExportASTNode {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 pub struct IfASTNode {
     pub condition: String,
@@ -124,8 +154,16 @@ pub struct ElseASTNode {
     pub steps: Vec<Box<dyn ASTNode>>,
 }
 
-impl ASTNode for IfASTNode {}
-impl ASTNode for ElseASTNode {}
+impl ASTNode for IfASTNode {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
+impl ASTNode for ElseASTNode {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 impl Debug for IfASTNode {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -165,7 +203,11 @@ pub struct TargetGenericStep {
     line: String,
 }
 
-impl ASTNode for TargetGenericStep {}
+impl ASTNode for TargetGenericStep {
+    fn render_graphviz_node(&self, curr_i: &mut u64) -> fmt::Arguments {
+        todo!()
+    }
+}
 
 impl Debug for TargetGenericStep {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
